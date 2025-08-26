@@ -1,0 +1,51 @@
+Calendar {
+    align: center middle;
+}
+
+.calendar-days {
+    layout: grid;
+    grid-size: 7 1;
+    height: auto;
+    background: white;
+}
+
+.calendar-top {
+    height: auto;
+}
+
+.centered {
+    align: center middle;
+}
+
+.day-container {
+    align: center middle;
+    height: 8;
+    width: 14;
+}
+
+.padding {
+    &.small {
+        padding: 1
+    }
+    &.medium {
+        padding: 2
+    }
+    &.large {
+        padding: 4
+    }
+}
+
+.title {
+    align: center middle;
+    padding: 1;
+    height: auto;
+}
+
+#calendar-container {
+    max-height: 42;
+    width: 100;
+}
+
+#date-container {
+
+}
