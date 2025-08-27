@@ -118,13 +118,17 @@ class DatabaseManager:
             data_to_insert.append(
                 month_num, serialized_weeks
             )
+        try:
+            self._cursor.executemany(f"""
+                INSERT OR IGNORE INTO {table_name} (month, weeks)
+                VALUES (?, ?)
 
-        self._cursor.executemany(f"""
-            INSERT OR IGNORE INTO {table_name} (month, weeks)
-            VALUES (?, ?)
-
-        """, data_to_insert)
-        self._connection.commit()
+            """, data_to_insert)
+            self._connection.commit()
+        except sqlite3.OperationalError as e:
+            console.log(f"Error creating table {table_name}: {e}")
+        except Exception as e:
+            console.log(f"Unexpected error while writing year data to db: {e}")
 
     def get_month_data(self, year: int, month: int) -> Optional[dict[int, list[dict[str, Any]]]]:
         """
