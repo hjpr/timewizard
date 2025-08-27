@@ -8,7 +8,6 @@ from textual.widgets import (
     Footer,
     Header,
     Label,
-    Static
 )
 
 from screens.finances import FinancesScreen
@@ -32,6 +31,7 @@ class QuitScreen(ModalScreen):
             self.app.exit()
         else:
             self.app.pop_screen()
+
 
 class MainScreen(Screen):
 

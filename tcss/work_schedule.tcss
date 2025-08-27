@@ -19,8 +19,9 @@ Calendar {
 
 .day-container {
     align: center middle;
-    height: 8;
-    width: 14;
+    min-height: 10;
+    width: 20;
+    outline: solid red;
 }
 
 .padding {
@@ -42,10 +43,12 @@ Calendar {
 }
 
 #calendar-container {
-    max-height: 42;
+    align: center middle;
     width: 100;
 }
 
 #date-container {
-
+    layout: grid;
+    grid-size: 7 6;
+    height: 36;
 }
