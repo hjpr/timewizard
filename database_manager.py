@@ -9,7 +9,7 @@ console = Console()
 
 class DatabaseManager:
 
-    def __init__(self, db_path: str = "/db/calendar.db") -> None:
+    def __init__(self, db_path: str = "db/calendar.db") -> None:
         self.db_path = db_path
         self._connection: Optional[sqlite3.Connection] = None
         self._cursor: Optional[sqlite3.Cursor] = None
@@ -38,13 +38,13 @@ class DatabaseManager:
         self._cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                month INTEGER NOT NULL UNIQUE, -- Month should be unique within a year table
+                month INTEGER NOT NULL UNIQUE,
                 weeks TEXT NOT NULL
             )
         """)
         self._connection.commit()
 
-    def build_year_calendar(self, year: int) -> dict:
+    def _build_year_calendar(self, year: int) -> dict:
         """
         Builds full year calendar structure for given year.
 
@@ -57,10 +57,11 @@ class DatabaseManager:
         """
         year_calendar = {}
         for month in range(1, 13):
-            year_calendar[month] = self.build_month_calendar(year, month)
+            year_calendar[month] = self._build_month_calendar(year, month)
+        return year_calendar
 
     @staticmethod
-    def build_month_calendar(year: int, month: int) -> dict[int, list[dict[str, int | bool | datetime.date]]]:
+    def _build_month_calendar(year: int, month: int) -> dict[int, list[dict[str, int | bool | datetime]]]:
         """
         Builds a calendar structure for a given month and year,
         including day details and timestamps.
@@ -103,6 +104,23 @@ class DatabaseManager:
         
         return month_dict
     
+    def year_exists(self, year: int) -> bool:
+        """
+        Checks if year table is present and contains all 12 months.
+        """
+        table_name = f"calendar_{year}"
+        self._cursor.execute(f"""
+            SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';
+        """)
+        if not self._cursor.fetchone():
+            return False
+        
+        self._cursor.execute(f"""
+            SELECT COUNT(DISTINCT month) FROM {table_name}
+        """)
+        count = self._cursor.fetchone()[0]
+        return count == 12
+    
     def insert_full_year(self, year: int) -> None:
         """
         Writes full year data to year-specific table.
@@ -110,19 +128,18 @@ class DatabaseManager:
         self._create_year_table(year)
         table_name = f"calendar_{year}"
 
-        year_data = self.build_year_calendar(year)
+        year_data = self._build_year_calendar(year)
 
         data_to_insert = []
         for month_num, month_weeks_data in year_data.items():
             serialized_weeks = json.dumps(month_weeks_data)
             data_to_insert.append(
-                month_num, serialized_weeks
+                (month_num, serialized_weeks)
             )
         try:
             self._cursor.executemany(f"""
-                INSERT OR IGNORE INTO {table_name} (month, weeks)
-                VALUES (?, ?)
-
+                INSERT INTO {table_name} (month, weeks) VALUES (?, ?)
+                ON CONFLICT (month) DO NOTHING;
             """, data_to_insert)
             self._connection.commit()
         except sqlite3.OperationalError as e:

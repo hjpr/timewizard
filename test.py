@@ -7,6 +7,7 @@ from rich.console import Console
 
 console = Console()
 
+
 def build_year_calendar(year: int) -> dict[int, dict[int, list[dict[str, Any]]]]:
     """
     Builds full year calendar structure for given year.
@@ -14,7 +15,7 @@ def build_year_calendar(year: int) -> dict[int, dict[int, list[dict[str, Any]]]]
     Args:
     year (int): The year for the calendar
 
-    Returns: 
+    Returns:
     dict: A dictionary where keys are month numbers (1-12)
         and values are a dict of week numbers
     """
@@ -37,13 +38,15 @@ def build_month_calendar(year: int, month: int) -> dict[int, list[dict[str, Any]
     dict: A dictionary where keys are week numbers (1-indexed)
             and values are lists of dictionaries, each representing a day.
     """
-    month_dict: dict[int, list[dict[str, int | str | bool | float | datetime.date]]] = {}
+    month_dict: dict[
+        int, list[dict[str, int | str | bool | float | datetime.date]]
+    ] = {}
     calendar_instance = calendar.Calendar(firstweekday=calendar.SUNDAY)
-    calendar_structure = calendar_instance.monthdatescalendar(year, month) # [1]
+    calendar_structure = calendar_instance.monthdatescalendar(year, month)  # [1]
 
     for week_num, week_of_dates in enumerate(calendar_structure, start=1):
         full_week = []
-        
+
         for index, date_obj in enumerate(week_of_dates):
             day_month = date_obj.month
             day_day = date_obj.day
@@ -62,10 +65,11 @@ def build_month_calendar(year: int, month: int) -> dict[int, list[dict[str, Any]
                 "date_string": str(date_obj),
             }
             full_week.append(day_info)
-        
+
         month_dict[week_num] = full_week
-    
+
     return month_dict
+
 
 # Print a portion of the calendar data to see the structure
 try:

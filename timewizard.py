@@ -1,4 +1,3 @@
-from rich_pixels import Pixels
 from textual import log
 from textual.app import App, ComposeResult
 from textual.containers import Grid
@@ -9,7 +8,6 @@ from textual.widgets import (
     Header,
     Label,
 )
-
 from screens.finances import FinancesScreen
 from screens.monthly_summary import MonthlySummaryScreen
 from screens.projects import ProjectsScreen
@@ -34,14 +32,12 @@ class QuitScreen(ModalScreen):
 
 
 class MainScreen(Screen):
-
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         yield Footer()
 
 
 class TimeWizardApp(App):
-
     BINDINGS = [
         ("escape", "switch_mode_or_quit", "Back"),
         ("w", "switch_mode('work_schedule')", "Work Schedule"),
@@ -53,27 +49,28 @@ class TimeWizardApp(App):
         "tcss/finances.tcss",
         "tcss/monthly_summary.tcss",
         "tcss/projects.tcss",
-        "tcss/work_schedule.tcss"
+        "tcss/work_schedule.tcss",
     ]
     MODES = {
-        "main": MainScreen, 
+        "main": MainScreen,
         "work_schedule": WorkScheduleScreen,
         "finances": FinancesScreen,
         "projects": ProjectsScreen,
-        "monthly_summary": MonthlySummaryScreen
+        "monthly_summary": MonthlySummaryScreen,
     }
 
     def action_switch_mode_or_quit(self) -> None:
         """If user on the main screen, exit, else go back to main screen."""
         if self.current_mode == "main":
-            self.app.push_screen(QuitScreen()) 
+            self.app.push_screen(QuitScreen())
         else:
             self.switch_mode("main")
-    
+
     def on_mount(self) -> None:
         self.title = "TIMEWIZARD"
         self.sub_title = "Yer an' adult Harry!"
         self.switch_mode("main")
+
 
 if __name__ == "__main__":
     app = TimeWizardApp()
