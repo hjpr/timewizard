@@ -1,7 +1,10 @@
 import sqlite3
 import calendar
 import json
-from datetime import datetime
+import datetime
+import time
+import rich
+from datetime import timedelta
 from rich.console import Console
 from typing import List, Dict, Any, Optional, Tuple
 
@@ -29,22 +32,26 @@ class DatabaseManager:
             self._connection = None
             self._cursor = None
 
-    def _create_year_table(self, year: int) -> None:
+    def create_year_table(self, year: int) -> None:
         """
         Create calendar table for a specific year if it doesn't exist.
         Table name dynamically includes the year.
         """
-        table_name = f"calendar_{year}"
+        table_name = f"calendar"
         self._cursor.execute(f"""
             CREATE TABLE IF NOT EXISTS {table_name} (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                month INTEGER NOT NULL UNIQUE,
-                weeks TEXT NOT NULL
+                date_string TEXT PRIMARY KEY NOT NULL,
+                year INTEGER NOT NULL,
+                month INTEGER NOT NULL,
+                day INTEGER NOT NULL,
+                is_weekend BOOL NOT NULL,
+                is_working BOOL NOT NULL,
+                is_overtime BOOL NOT NULL
             )
         """)
         self._connection.commit()
 
-    def _build_year_calendar(self, year: int) -> dict:
+    def build_year_calendar(self, year: int) -> dict[str, str | int | bool]:
         """
         Builds full year calendar structure for given year.
 
@@ -55,60 +62,31 @@ class DatabaseManager:
         dict: A dictionary where keys are month numbers (1-12)
             and values are a dict of week numbers
         """
-        year_calendar = {}
-        for month in range(1, 13):
-            year_calendar[month] = self._build_month_calendar(year, month)
-        return year_calendar
+        date_list = []
+        start_date = datetime.date(year, 1, 1)
+        end_date = datetime.date(year, 12, 31)
 
-    @staticmethod
-    def _build_month_calendar(year: int, month: int) -> dict[int, list[dict[str, int | bool | datetime]]]:
-        """
-        Builds a calendar structure for a given month and year,
-        including day details and timestamps.
-
-        Args:
-        year (int): The year for the calendar.
-        month (int): The month for the calendar (1-12).
-
-        Returns:
-        dict: A dictionary where keys are week numbers (1-indexed)
-                and values are lists of dictionaries, each representing a day.
-        """
-        month_dict: dict[int, list[dict[str, int | str | bool | float | datetime.date]]] = {}
-        calendar_instance = calendar.Calendar(firstweekday=calendar.SUNDAY)
-        calendar_structure = calendar_instance.monthdatescalendar(year, month) # [1]
-
-        for week_num, week_of_dates in enumerate(calendar_structure, start=1):
-            full_week = []
-            
-            for index, date_obj in enumerate(week_of_dates):
-                day_month = date_obj.month
-                day_day = date_obj.day
-                day_year = date_obj.year
-
-                is_weekend = date_obj.weekday() in (5, 6)
-
-                day_info = {
-                    "index": index,
-                    "year": day_year,
-                    "month": day_month,
-                    "day": day_day,
-                    "is_weekend": is_weekend,
-                    "is_working": False,
-                    "is_overtime": False,
-                    "date_string": str(date_obj),
-                }
-                full_week.append(day_info)
-            
-            month_dict[week_num] = full_week
-        
-        return month_dict
+        current_date: datetime.datetime = start_date
+        while current_date <= end_date:
+            day_data = {
+                "date_string": str(current_date),
+                "year": current_date.year,
+                "month": current_date.month,
+                "day": current_date.day,
+                "is_weekend": bool(current_date.weekday() >= 5),
+                "is_working": False,
+                "is_overtime": False
+            }
+            date_list.append(day_data)
+            current_date += timedelta(days=1)
+        return date_list
     
     def year_exists(self, year: int) -> bool:
         """
-        Checks if year table is present and contains all 12 months.
+        Checks if table is present and contains a day entry for given year.
         """
-        table_name = f"calendar_{year}"
+        table_name = f"calendar"
+
         self._cursor.execute(f"""
             SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}';
         """)
@@ -116,89 +94,109 @@ class DatabaseManager:
             return False
         
         self._cursor.execute(f"""
-            SELECT COUNT(DISTINCT month) FROM {table_name}
-        """)
-        count = self._cursor.fetchone()[0]
-        return count == 12
-    
+            SELECT date_string FROM calendar WHERE date_string = ?
+        """, [f"{year}-01-01"])
+        if not self._cursor.fetchone():
+            return False
+        
+        return True
+        
     def insert_full_year(self, year: int) -> None:
         """
         Writes full year data to year-specific table.
         """
-        self._create_year_table(year)
-        table_name = f"calendar_{year}"
+        self.create_year_table(year)
+        year_data = self.build_year_calendar(year)
 
-        year_data = self._build_year_calendar(year)
-
-        data_to_insert = []
-        for month_num, month_weeks_data in year_data.items():
-            serialized_weeks = json.dumps(month_weeks_data)
-            data_to_insert.append(
-                (month_num, serialized_weeks)
-            )
         try:
             self._cursor.executemany(f"""
-                INSERT INTO {table_name} (month, weeks) VALUES (?, ?)
-                ON CONFLICT (month) DO NOTHING;
-            """, data_to_insert)
+                INSERT INTO calendar (
+                    date_string, year, month, day, is_weekend, is_working, is_overtime
+                ) VALUES (:date_string, :year, :month, :day, :is_weekend, :is_working, :is_overtime)
+                ON CONFLICT (date_string) DO NOTHING
+            """, year_data)
             self._connection.commit()
         except sqlite3.OperationalError as e:
-            console.log(f"Error creating table {table_name}: {e}")
+            console.log(f"Error creating year {year}: {e}")
         except Exception as e:
             console.log(f"Unexpected error while writing year data to db: {e}")
 
-    def get_month_data(self, year: int, month: int) -> Optional[dict[int, list[dict[str, Any]]]]:
-        """
-        Retrieves month's calendar data from the database and deserializes it
-
-        Args:
-            year (int): year
-            month (int): month (1-12)
-
-        Returns:
-            Optional[dict]: Dictionary representing the months calendar, or None 
-                if month data is not found.
-        """
-        table_name = f"calendar_{year}"
+    def get_days_data(self, dates: list[str]) -> Optional[dict[str, str | int | bool]]:
         try:
-            self._cursor.execute(f"""
-                SELECT weeks FROM {table_name} WHERE month = ?
-            """, [month])
-            row = self._cursor.fetchone()
-            if row:
-                serialized_weeks = row["weeks"]
-                return json.loads(serialized_weeks)
-        except sqlite3.OperationalError as e:
-            console.log(f"Error accessing table {table_name}: {e}")
-        
-    def write_month_data(self, year: int, month: int, month_data: dict[int, list[dict[str, Any]]]) -> bool:
-        """
-        Serializes the given month_data and writes back to database for specified year and month.
-
-        Args:
-            year (int): year.
-            month (int): month (1-12).
-            month_data (dict): Dictionary containing month calendar data after modifications.
-
-        Returns:
-            bool: True if update successful, otherwise False.
-        """
-        table_name = f"calendar_{year}"
-        try:
-            serialized_weeks = json.dumps(month_data)
-            self._cursor.execute(f"""
-                UPDATE {table_name}
-                SET weeks = ?
-                WHERE month = ?
-            """, (serialized_weeks, month))
-            self._connection.commit()
-            if self._cursor.rowcount > 0:
-                console.log(f"Updated {table_name} at month: {month}, year: {year}")
-                return True
-            else:
-                return False
-        except sqlite3.OperationalError as e:
-            console.log(f"Error updating table {table_name}: {e}")
-            return False
+            days_data = []
+            for date in dates:   
+                self._cursor.execute(f"""
+                    SELECT * FROM calendar WHERE date_string = ?
+                """, (date,))
+                row = self._cursor.fetchone()
+                if row:
+                    column_names = [description[0] for description in self._cursor.description]
+                    day_dict = dict(zip(column_names, row))
+                    days_data.append(day_dict)
+            return days_data
+            
         except Exception as e:
-            console.log(f"Unexpected error while writing month data to db: {e}")
+            console.log(f"Unable to retrieve {date} from table calendar: {str(e)}")
+
+    def update_day_info(self, date_string: str, column: str, value: str | int | bool) -> None:
+        try:
+            self._cursor.execute(f"""
+                UPDATE calendar SET {column} = ? WHERE date_string = ?
+            """, (value, date_string))
+            self._connection.commit()
+        except Exception:
+            console.print_exception()
+
+
+if __name__ == "__main__":
+    # Initialize timers
+    start_time = time.perf_counter()
+    last_checkpoint_time = start_time
+
+    # --- Section 1: Initialization ---
+    console.log("[bold yellow]Initializing database...[/bold yellow]")
+    db_manager: DatabaseManager = DatabaseManager()
+    
+    current_time = time.perf_counter()
+    elapsed_ms = (current_time - last_checkpoint_time) * 1000
+    console.log(f"[cyan]Initialization complete. (+{elapsed_ms:.2f}ms)[/cyan]")
+    last_checkpoint_time = current_time # Update checkpoint
+
+    # --- Section 2: Table Creation ---
+    console.log("[bold yellow]Creating tables...[/bold yellow]")
+    db_manager.create_year_table(2025)
+
+    current_time = time.perf_counter()
+    elapsed_ms = (current_time - last_checkpoint_time) * 1000
+    console.log(f"[cyan]Table creation complete. (+{elapsed_ms:.2f}ms)[/cyan]")
+    last_checkpoint_time = current_time # Update checkpoint
+
+    # --- Section 3: Data Insertion (Conditional) ---
+    if not db_manager.year_exists(2025):
+        console.log("[bold yellow]No data in table, inserting year data...[/bold yellow]")
+        db_manager.insert_full_year(2025)
+        
+        current_time = time.perf_counter()
+        elapsed_ms = (current_time - last_checkpoint_time) * 1000
+        console.log(f"[cyan]Data insertion complete. (+{elapsed_ms:.2f}ms)[/cyan]")
+        last_checkpoint_time = current_time # Update checkpoint
+
+    assert db_manager.year_exists(2025)
+    console.log("[bold yellow]Table populated with year data properly...[/bold yellow]")
+
+    # --- Section 4: Data Retrieval ---
+    console.log("[bold yellow]Retrieving a few dates...[/bold yellow]")
+    days_data = db_manager.get_days_data(["2025-01-02", "2025-01-03"])
+    
+    current_time = time.perf_counter()
+    elapsed_ms = (current_time - last_checkpoint_time) * 1000
+    console.log(f"[cyan]Data retrieval complete. (+{elapsed_ms:.2f}ms)[/cyan]")
+    last_checkpoint_time = current_time # Update checkpoint
+    
+    assert days_data[0]["date_string"] == "2025-01-02"
+    assert days_data[1]["date_string"] == "2025-01-03"
+
+    # --- Final Summary ---
+    total_elapsed_ms = (time.perf_counter() - start_time) * 1000
+    console.log(f"\n[bold green]Database tests passed![/bold green]")
+    console.log(f"[bold green]Total execution time: {total_elapsed_ms:.2f}ms[/bold green]")

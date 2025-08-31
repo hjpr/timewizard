@@ -1,21 +1,25 @@
-Calendar {
+CalendarView {
     align: center middle;
 }
 
 .calendar-days {
     layout: grid;
-    grid-size: 7 1;
-    height: auto;
-    background: white;
+    grid-size: 7 6;
+    height: 42;
 }
+
 
 .calendar-top {
     height: auto;
+    padding: 1;
+    outline: solid $secondary-muted;
 }
 
 .day-container {
     align: center middle;
-    outline: solid red;
+    border: solid $secondary-muted;
+    border-title-color: $primary;
+    border-subtitle-color: $accent-muted;
 }
 
 .title {
@@ -26,8 +30,16 @@ Calendar {
 
 #calendar-container {
     align: center middle;
-    height: 75%;
-    width: 75%;
+    width: 112;
+}
+
+#calendar-labels {
+    align: center middle;
+    layout: grid;
+    grid-size: 7 1;
+    outline: solid $secondary-muted;
+    height: 5;
+
 }
 
 #date-container {
