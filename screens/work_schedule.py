@@ -1,4 +1,5 @@
 import calendar
+import itertools
 
 from calendar import Calendar
 from datetime import datetime
@@ -23,7 +24,7 @@ class CalendarView(Widget):
     WEEKEND_RATE_PER_HOUR: int = 10
 
     db_manager: DatabaseManager = DatabaseManager()
-    days: Reactive = reactive([], recompose=True)
+    days: Reactive[list[dict[str, str | int | bool]]] = reactive([], recompose=True)
     today: datetime = datetime.today().date()
     today_month: int = today.month
     today_year: int = today.year
@@ -46,14 +47,14 @@ class CalendarView(Widget):
                 yield Label("Sat", classes="title")
             with Container(classes="calendar-days"):
                 for day in self.days:
-                    log(day)
-                    day_container = Container(classes="day-container")
+                    day_container = Container(classes="day-container", id=f"container-{day['date_string']}")
                     day_container.border_title = str(day["day"])
+                    day_container.border_subtitle = f"${round(
+                        (self.BASE_RATE_PER_HOUR * 12)
+                        + (self.WEEKEND_RATE_PER_HOUR * 12 if day["is_weekend"] else 0)
+                        )}"
                     with day_container:
                         yield Switch(value=day["is_working"], name=f"{day["date_string"]}")
-                                # (self.BASE_RATE_PER_HOUR * 12)
-                                # + (self.WEEKEND_RATE_PER_HOUR * 12 if day["is_weekend"] else 0)
-                                # overtime_pay = 8 * 36.15
 
     def on_mount(self) -> None:
         # Ensure current year, previous year, and next year's calendar is prebuilt into database.
@@ -64,7 +65,7 @@ class CalendarView(Widget):
         self.refresh_calendar()
 
     def refresh_calendar(self) -> None:
-        # Construct list of days to get based on current calendar view
+        # Construct list of days to get based on current calendar view.
         calendar_week_list = Calendar()
         calendar_week_list.setfirstweekday(calendar.SUNDAY)
         calendar_week_list = calendar_week_list.monthdatescalendar(
@@ -84,10 +85,45 @@ class CalendarView(Widget):
         self.refresh_calendar()
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
+        # Send update to database.
         date_string = event.switch.name
         column = "is_working"
         new_value = event.switch.value
         self.db_manager.update_day_info(date_string, column, new_value)
+        for day in self.days:
+            if day["date_string"] == date_string:
+                day["is_working"] = new_value
+
+        # Update local values if week is overtime week.
+        list_of_weeks = itertools.batched(self.days, 7)
+        for week in list_of_weeks:
+            days_working = [day for day in week if day["is_working"]]
+            if len(days_working) >= 3:
+                third_shift_day = days_working[2]
+                # Get the position of the last day worked.
+                index_third_shift = week.index(third_shift_day)
+                overtime_potential_days = list(week[index_third_shift + 1:])
+                if overtime_potential_days:
+                    for day in overtime_potential_days:
+                        container = self.query_one(f"#container-{day["date_string"]}")
+                        container.border_subtitle = f"${round(
+                            (self.BASE_RATE_PER_HOUR * 12)
+                            + (self.WEEKEND_RATE_PER_HOUR * 12 if day["is_weekend"] else 0)
+                            + (8 * 36.15)
+                            )}"
+            else:
+                for day in week:
+                    container = self.query_one(f"#container-{day["date_string"]}")
+                    container.border_subtitle = f"${round(
+                        (self.BASE_RATE_PER_HOUR * 12)
+                        + (self.WEEKEND_RATE_PER_HOUR * 12 if day["is_weekend"] else 0)
+                        )}"
+
+
+
+
+
+
           
 
 class WorkScheduleScreen(DatabaseScreen):
