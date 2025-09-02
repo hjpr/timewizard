@@ -2,24 +2,35 @@ CalendarView {
     align: center middle;
 }
 
-.calendar-days {
+.calendar-weeks {
     layout: grid;
-    grid-size: 7 6;
-    height: 42;
+    grid-size: 7 1;
+    height: auto;
 }
 
 
 .calendar-top {
     height: auto;
     padding: 1;
-    outline: solid $secondary-muted;
+    outline: round $secondary-muted;
+    width: 100%;
 }
 
 .day-container {
     align: center middle;
-    border: solid $secondary-muted;
+    border: round $secondary-muted;
     border-title-color: $primary;
     border-subtitle-color: $accent-muted;
+    padding: 1;
+    height: auto;
+    width: 100%;
+}
+
+.pay-week {
+    align: center middle;
+    border: round $primary-muted;
+    color: $primary;
+    width: 1fr;
 }
 
 .title {
@@ -29,20 +40,31 @@ CalendarView {
 }
 
 #calendar-container {
-    align: center middle;
-    width: 112;
+    height: auto;
+    width: 110; # Leave at 110
 }
 
 #calendar-labels {
     align: center middle;
     layout: grid;
     grid-size: 7 1;
-    outline: solid $secondary-muted;
+    outline: round $secondary-muted;
     height: 5;
+    width: 100%;
+}
 
+#calendar-window {
+    align: center middle;
+    padding: 2;
+    width: 100%;
 }
 
 #date-container {
     layout: grid;
     grid-size: 7 6;
+}
+
+#quick-pay-summary {
+    height: 8;
+    width: 100%;
 }

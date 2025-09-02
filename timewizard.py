@@ -67,6 +67,7 @@ class TimeWizardApp(App):
             self.switch_mode("main")
 
     def on_mount(self) -> None:
+        self.theme = "catppuccin-mocha"
         self.title = "TIMEWIZARD"
         self.sub_title = "Yer an' adult Harry!"
         self.switch_mode("main")
