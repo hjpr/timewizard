@@ -30,7 +30,9 @@ CalendarView {
     align: center middle;
     border: round $primary-muted;
     color: $primary;
+    padding: 1;
     width: 1fr;
+    height: auto;
 }
 
 .title {

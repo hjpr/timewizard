@@ -9,6 +9,7 @@ from textual.widgets import (
     Label,
 )
 from screens.finances import FinancesScreen
+from screens.expenses import ExpensesScreen
 from screens.monthly_summary import MonthlySummaryScreen
 from screens.projects import ProjectsScreen
 from screens.work_schedule import WorkScheduleScreen
@@ -42,6 +43,7 @@ class TimeWizardApp(App):
         ("escape", "switch_mode_or_quit", "Back"),
         ("w", "switch_mode('work_schedule')", "Work Schedule"),
         ("f", "switch_mode('finances')", "Finances"),
+        ("e", "switch_mode('expenses')"),
         ("p", "switch_mode('projects')", "Projects"),
         ("m", "switch_mode('monthly_summary')", "Monthly Summary"),
     ]
@@ -55,6 +57,7 @@ class TimeWizardApp(App):
         "main": MainScreen,
         "work_schedule": WorkScheduleScreen,
         "finances": FinancesScreen,
+        "expenses": ExpensesScreen,
         "projects": ProjectsScreen,
         "monthly_summary": MonthlySummaryScreen,
     }
