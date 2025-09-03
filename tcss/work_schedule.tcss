@@ -20,7 +20,7 @@ CalendarView {
     align: center middle;
     border: round $secondary-muted;
     border-title-color: $primary;
-    border-subtitle-color: $accent-muted;
+    border-subtitle-color: $secondary-muted;
     padding: 1;
     height: auto;
     width: 100%;
@@ -33,6 +33,10 @@ CalendarView {
     padding: 1;
     width: 1fr;
     height: auto;
+}
+
+.switch-on {
+    background: $accent-muted;
 }
 
 .title {

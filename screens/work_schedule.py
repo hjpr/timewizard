@@ -81,19 +81,22 @@ class CalendarView(Widget):
     monthly_pay: Reactive[int] = reactive(0)
     job: dict = {}
     today: datetime = datetime.today().date()
-    today_month: int = today.month
-    today_year: int = today.year
-    selected_month: str = calendar.month_name[today_month]
-    selected_month_int: int = today_month
-    selected_year: int = today_year
-    week_1: str = ""
+    selected_month: str = calendar.month_name[today.month]
+    selected_month_int: int = today.month
+    selected_year: int = today.year
+
+    primary_color: str
+    primary_color_muted: str
+    secondary_color: str
+    secondary_color_muted: str
+
 
     def compose(self) -> ComposeResult:
         with VerticalScroll(id="calendar-window"):
             with Container(id="calendar-container"):
                 with Horizontal(classes="calendar-top"):
                     yield Select.from_values([month for month in calendar.month_name if month], value=self.selected_month, id="select-month")
-                    yield Select.from_values([self.today_year - 1, self.today_year, self.today_year + 1], value=self.today_year, id="select-year")
+                    yield Select.from_values([self.today.year - 1, self.today.year, self.today.year + 1], value=self.selected_year, id="select-year")
                 with Container(id="calendar-labels"):
                     yield Label("Sun", classes="title")
                     yield Label("Mon", classes="title")
@@ -109,10 +112,14 @@ class CalendarView(Widget):
                             day_container = Container(classes="day-container", id=f"container-{day['date_string']}")
                             day_container.border_title = str(day["day"])
                             day_container.styles.border = ("round", self.app.get_css_variables().get("primary")) if day["date_string"] == str(self.today) else ("round", self.app.get_css_variables().get("secondary-muted"))
-                            day_container.styles.border_title_background = self.app.get_css_variables().get("secondary-muted") if day["date_string"] in self.biweekly_pay_days.keys() else None
                             day_container.border_subtitle = f"${round(day["worth"])}"
                             with day_container:
-                                yield Switch(value=day["is_working"], name=f"{day["date_string"]}")
+                                yield Switch(
+                                    value=day["is_working"],
+                                    name=f"{day["date_string"]}",
+                                    classes=f"{"switch-on" if day ["is_working"] else ""}"
+                                    
+                                )
                 with Horizontal(id="quick-pay-summary"):
                     for date, amount in self.biweekly_pay_days.items():
                         with Container(classes="pay-week"):
@@ -143,24 +150,25 @@ class CalendarView(Widget):
                         )
 
     def on_mount(self) -> None:
+        """Runs list of functions when mounting the widget."""
+        self.primary_color = self.app.get_css_variables().get("primary")
+        self.primary_color_muted = self.app.get_css_variables().get("primary-muted")
+        self.secondary_color = self.app.get_css_variables().get("secondary")
+        self.secondary_color_muted = self.app.get_css_variables().get("secondary-muted")
+
         # Ensure current year, previous year, and next year's calendar is prebuilt into database.
         current_year = datetime.now().year
         for increment in (-1, 0, 1):
             if not self.db_manager.year_exists(current_year + increment):
                 self.db_manager.insert_year(current_year + increment)
 
-        # Pull calendar data into instance and recompose.
         self.refresh_calendar()
-        
-        # Pull job data into instance.
-        self.job = self.db_manager.get_job("unc_nursing")
-
-        # Calculate weekly pay from working days.
+        self.job = self.db_manager.get_job("unc_nursing") # Job data for pay rates
         self.calculate_pay_day_pay()
 
 
     def on_select_changed(self, event: Select.Changed) -> None:
-        """Handle select changed events."""
+        """fires when any select menu is set."""
         if event.select.id == "select-month":
             self.selected_month = event.select.value
             self.selected_month_int = list(calendar.month_name).index(self.selected_month)
@@ -172,12 +180,16 @@ class CalendarView(Widget):
         self.calculate_pay_day_pay()
 
     def on_switch_changed(self, event: Switch.Changed) -> None:
-        """Handle switch changed events."""
+        """Fires when any switch is actuated."""
+        if event.value:
+            event.switch.add_class("switch-on")
+        else:
+            event.switch.remove_class("switch-on")
+
         date_string = event.switch.name
         column = "is_working"
         new_value = event.switch.value
-
-        # Update the db, local state, and rewrite the subtitles for pay/OT.
+        # Update is_working column in the db
         self.db_manager.update_day(date_string, column, new_value)
         for day in self.days:
             if day["date_string"] == date_string:
@@ -186,17 +198,8 @@ class CalendarView(Widget):
         self.refresh_pay_subtitle()
         self.calculate_pay_day_pay()
 
-    def watch_pay_by_week(self, new_pay: dict[str, int]) -> None:
-            """Called when the pay_by_week reactive is updated."""
-            for week_id, pay_value in new_pay.items():
-                try:
-                    label = self.query_one(f"#{week_id}", Label)
-                    label.update(f"${round(pay_value)}")
-                except Exception:
-                    # This can happen if the widget hasn't been mounted yet, so we can safely ignore it.
-                    pass
-
     def watch_biweekly_pay_days(self) -> None:
+        """Fires when biweekly pay gets newly set."""
         for week_str, amount in self.biweekly_pay_days.items():
             try:
                 label = self.query_one(f"#payday-{week_str}", Label)
@@ -210,6 +213,7 @@ class CalendarView(Widget):
                 pass
 
     def watch_monthly_pay(self) -> None:
+        """Fires when monthly pay gets newly set."""
         try:
             label = self.query_one("#monthly-pay", Label)
             label.update(f"Month: ${round(self.monthly_pay)}")
@@ -221,7 +225,8 @@ class CalendarView(Widget):
                     
     def calculate_pay_day_pay(self) -> None:
         """
-        Builds pay_day_ranges so that we can store a list of days under a payday to calc total money.
+        Calculates the total earnings per pay period including OT, as well as monthly totals. Also accounts
+        for taxes. Can tweak the biweekly pay with percentages to track ADP more closely.
         """
         biweekly_pay_days = {}
         total_monthly_pay = 0
@@ -268,6 +273,22 @@ class CalendarView(Widget):
         self.biweekly_pay_days = biweekly_pay_days
         self.monthly_pay = total_monthly_pay
 
+    def refresh_calendar(self) -> None:
+        """
+        Rebuilds each month based on selected_year and selected_month_int by pulling the days from the
+        database and setting them to self.days.
+        """
+        calendar_week_list = Calendar()
+        calendar_week_list.setfirstweekday(calendar.SUNDAY)
+        calendar_week_list = calendar_week_list.monthdatescalendar(
+            self.selected_year, self.selected_month_int
+        )
+        calendar_days_list = []
+        for week in calendar_week_list:
+            for day in week:
+                calendar_days_list.append(str(day))
+        self.days = self.db_manager.get_days(calendar_days_list)    
+
     def refresh_pay_subtitle(self) -> None:
         """Update subtitle pay values if week is overtime week."""
         list_of_weeks = itertools.batched(self.days, 7)
@@ -309,19 +330,7 @@ class CalendarView(Widget):
                 except Exception:
                     # Between unmounts, can't find node so let it pass
                     pass
-                    
-    def refresh_calendar(self) -> None:
-        # Construct list of days to get based on current calendar view.
-        calendar_week_list = Calendar()
-        calendar_week_list.setfirstweekday(calendar.SUNDAY)
-        calendar_week_list = calendar_week_list.monthdatescalendar(
-            self.selected_year, self.selected_month_int
-        )
-        calendar_days_list = []
-        for week in calendar_week_list:
-            for day in week:
-                calendar_days_list.append(str(day))
-        self.days = self.db_manager.get_days(calendar_days_list)
+
 
 class WorkScheduleScreen(DatabaseScreen):
 
