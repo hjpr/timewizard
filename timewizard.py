@@ -43,7 +43,7 @@ class TimeWizardApp(App):
         ("escape", "switch_mode_or_quit", "Back"),
         ("w", "switch_mode('work_schedule')", "Work Schedule"),
         ("f", "switch_mode('finances')", "Finances"),
-        ("e", "switch_mode('expenses')"),
+        ("e", "switch_mode('expenses')", "Expenses"),
         ("p", "switch_mode('projects')", "Projects"),
         ("m", "switch_mode('monthly_summary')", "Monthly Summary"),
     ]

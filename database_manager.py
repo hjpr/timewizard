@@ -1,12 +1,9 @@
 import sqlite3
-import calendar
-import json
 import datetime
 import time
-import rich
 from datetime import timedelta
 from rich.console import Console
-from typing import List, Dict, Any, Optional, Tuple
+from typing import Optional
 
 console = Console()
 
@@ -33,6 +30,35 @@ class DatabaseManager:
             self._connection.close()
             self._connection = None
             self._cursor = None
+
+    def create_expenses_table(self) -> None:
+        """
+        Create expenses table.
+        Columns:
+            id: int
+            daily: bool
+            weekly: bool
+            biweekly: bool
+            monthly: bool
+            day: int
+            amount: float
+            name: str
+        """
+        table_name = "expenses"
+        self._cursor.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+            id INTEGER PRIMARY KEY ASC,
+            daily BOOL NOT NULL,
+            weekly BOOL NOT NULL,
+            biweekly BOOL NOT NULL,
+            monthly BOOL NOT NULL,
+            day INTEGER,
+            amount REAL NOT NULL,
+            name TEXT NOT NULL,
+            )         
+        """
+        )
+        self._connection.commit()
 
     def create_jobs_table(self) -> None:
         """
@@ -71,7 +97,19 @@ class DatabaseManager:
         """)
         self._connection.commit()
     
-    def get_days(self, dates: list[str]) -> Optional[dict[str, str | int | bool]]:
+    def get_days(self, dates: list[str]) -> Optional[list[dict[str, str | int | float | bool]]]:
+        """
+        Given a list of dates, returns list of dicts where dicts are days.
+        Columns:
+            date_string: str
+            year: int
+            month: int
+            day: int
+            is_weekend: bool
+            is_working: bool
+            is_overtime: bool
+            worth: float
+        """
         try:
             days_data = []
             for date in dates:   
@@ -88,6 +126,17 @@ class DatabaseManager:
             console.print_exception()
 
     def get_job(self, job_name: str) -> Optional[sqlite3.Row]:
+        """
+        Given a job name, returns row object.
+        Columns:
+            id: int
+            job_name: str
+            hourly_rate: float
+            overtime_rate: float
+            weekend_rate: float
+            night_rate: float
+            critical_rate: float
+        """
         try:
             self._cursor.execute(f"""
                 SELECT * FROM jobs WHERE job_name = ?
@@ -119,7 +168,7 @@ class DatabaseManager:
 
     def insert_year(self, year: int) -> None:
         """
-        Writes year data to table.
+        Writes year data to table for calendar use.
         """
         date_list = []
         start_date = datetime.date(year, 1, 1)

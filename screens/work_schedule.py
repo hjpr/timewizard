@@ -9,6 +9,7 @@ from textual.containers import Container, Horizontal, VerticalScroll
 from textual.reactive import Reactive, reactive
 from textual.widget import Widget
 from textual.widgets import (
+    Button,
     Footer,
     Header,
     Label,
@@ -19,7 +20,7 @@ from textual.widgets import (
 
 from .database import DatabaseManager, DatabaseScreen
 
-pay_days_by_month = {
+PAY_DAYS_BY_MONTH = {
     1: {
         date(2025, 1, 14): (date(2024, 12, 22), date(2025, 1, 4)),
         date(2025, 1, 28): (date(2025, 1, 5), date(2025, 1, 18))
@@ -166,7 +167,6 @@ class CalendarView(Widget):
         self.job = self.db_manager.get_job("unc_nursing") # Job data for pay rates
         self.calculate_pay_day_pay()
 
-
     def on_select_changed(self, event: Select.Changed) -> None:
         """fires when any select menu is set."""
         if event.select.id == "select-month":
@@ -230,7 +230,7 @@ class CalendarView(Widget):
         """
         biweekly_pay_days = {}
         total_monthly_pay = 0
-        pay_days = pay_days_by_month[self.selected_month_int]
+        pay_days = PAY_DAYS_BY_MONTH[self.selected_month_int]
         pay_day_ranges: dict[str, list[dict[str, str | int | bool]]] = {}
 
         # For each payday in a month, build a list of days to retrieve under that payday

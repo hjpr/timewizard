@@ -26,6 +26,10 @@ CalendarView {
     width: 100%;
 }
 
+.nav-button {
+    min-width: 8;
+}
+
 .pay-week {
     align: center middle;
     border: round $primary-muted;
